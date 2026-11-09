@@ -1,0 +1,70 @@
+# Local agent settings and credentials.
+/.agents/
+/.codex/
+/.aws/
+.env
+.env.*
+!.env.example
+
+# Installers and local license files.
+/qinst*.run
+LR-*_License*
+*.lic
+license.dat
+licenses/
+
+# Quartus databases, compilation output, and GUI state.
+db/
+incremental_db/
+output_files/
+atom_netlists/
+.qsys_edit/
+*.qws
+*.done
+*.rpt
+*.summary
+*.qmsg
+*.qar
+*.qarlog
+*.sof
+*.pof
+*.jic
+*.rbf
+*.rpd
+
+# Generated Platform Designer metadata and debug data.
+*.sopcinfo
+*.debuginfo
+
+# Regenerate this subsystem from fpga/memory_subsystem.qsys.
+# Do not ignore synthesis/ globally: the donor vendor RTL lives there.
+/fpga/memory_subsystem/
+/fpga/memory_subsystem.sopcinfo
+/fpga/unsaved/
+
+# Questa / ModelSim compiled libraries and runtime output.
+work/
+rtl_work/
+gate_work/
+libraries/
+questa_lib/
+transcript
+transcript.*
+vsim.wlf
+*.wlf
+*.vcd
+vsim_stacktrace.vstf
+
+# Third-party reference project. It was the source of the SDRAM controller RTL
+# and is kept locally as an archive only; it is not part of the Vision Core build.
+# The used RTL lives in IP/sdram_controller_altera14/rtl/.
+/IP/SDRAM-and-FIFO-for-DE1-SoC-master/
+
+# Editor backups and operating-system metadata.
+*.bak
+*.bak[0-9]*
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
