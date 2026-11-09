@@ -302,7 +302,7 @@ module RAMSYS_new_sdram_controller_0 (
       if (reset_n == 0)
           refresh_counter <= 14143;
       else if (refresh_counter == 0)
-          refresh_counter <= 1103;
+          refresh_counter <= 780;
       else 
         refresh_counter <= refresh_counter - 1'b1;
     end

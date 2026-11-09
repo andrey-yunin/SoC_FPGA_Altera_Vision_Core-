@@ -32,6 +32,10 @@ atom_netlists/
 *.rbf
 *.rpd
 
+# Generated simulation and pin-model artifacts.
+/fpga/simulation/
+/fpga/c5_pin_model_dump.txt
+
 # Generated Platform Designer metadata and debug data.
 *.sopcinfo
 *.debuginfo
