@@ -5,7 +5,7 @@ entity vision_core_top is
     port (
         CLOCK_50 : in    std_logic;
         RESET_N  : in    std_logic;
-        
+
         SW       : in    std_logic_vector(9 downto 0);
         KEY      : in    std_logic_vector(3 downto 1);  -- KEY0 физически занят под RESET_N
 
@@ -14,7 +14,7 @@ entity vision_core_top is
         HEX2     : out   std_logic_vector(6 downto 0);
         HEX3     : out   std_logic_vector(6 downto 0);
         HEX4     : out   std_logic_vector(6 downto 0);
-        HEX5     : out   std_logic_vector(6 downto 0);        
+        HEX5     : out   std_logic_vector(6 downto 0);
 
         DRAM_ADDR  : out   std_logic_vector(12 downto 0);
         DRAM_BA    : out   std_logic_vector(1 downto 0);
@@ -61,8 +61,8 @@ architecture rtl of vision_core_top is
             sdram_clk_clk             : out   std_logic
         );
     end component memory_subsystem;
-    
-    
+
+
     component reset_conditioner is
         port (
             clk           : in  std_logic;
@@ -72,7 +72,7 @@ architecture rtl of vision_core_top is
             reset_req_out : out std_logic
         );
     end component reset_conditioner;
-    
+
     --------------------------------------------------------------------------
     -- Формирователь кнопки: синхронизация, антидребезг, строб на один такт
     --------------------------------------------------------------------------
@@ -111,9 +111,35 @@ architecture rtl of vision_core_top is
             av_readdatavalid : in    std_logic;
             av_waitrequest   : in    std_logic
         );
-        end component memory_test_master;
-        
-        
+    end component memory_test_master;
+
+    component memory_autotest is
+        port (
+            clk              : in    std_logic;
+            reset_req        : in    std_logic;
+            start            : in    std_logic;
+            test_sel         : in    std_logic_vector(2 downto 0);
+            av_address       : out   std_logic_vector(24 downto 0);
+            av_writedata     : out   std_logic_vector(15 downto 0);
+            av_byteenable_n  : out   std_logic_vector(1 downto 0);
+            av_read_n        : out   std_logic;
+            av_write_n       : out   std_logic;
+            av_chipselect    : out   std_logic;
+            av_readdata      : in    std_logic_vector(15 downto 0);
+            av_readdatavalid : in    std_logic;
+            av_waitrequest   : in    std_logic;
+            busy             : out   std_logic;
+            active           : out   std_logic;
+            hex0             : out   std_logic_vector(6 downto 0);
+            hex1             : out   std_logic_vector(6 downto 0);
+            hex2             : out   std_logic_vector(6 downto 0);
+            hex3             : out   std_logic_vector(6 downto 0);
+            hex4             : out   std_logic_vector(6 downto 0);
+            hex5             : out   std_logic_vector(6 downto 0)
+        );
+    end component memory_autotest;
+
+
     signal pll_locked     : std_logic;
     signal pll_not_locked : std_logic;
     signal reset_n_sys    : std_logic;  -- очищенный сброс для подсистемы
@@ -127,12 +153,12 @@ architecture rtl of vision_core_top is
     signal btn_w_stb : std_logic;
     signal btn_r_stb : std_logic;
 
-    -- Clock and responses for the future Avalon-MM master.
+    -- Clock and responses for the Avalon-MM test masters.
     signal memory_clk           : std_logic;
     signal memory_readdata      : std_logic_vector(15 downto 0);
     signal memory_readdatavalid : std_logic;
     signal memory_waitrequest   : std_logic;
-    
+
     signal av_address      : std_logic_vector(24 downto 0);
     signal av_writedata    : std_logic_vector(15 downto 0);
     signal av_byteenable_n : std_logic_vector(1 downto 0);
@@ -140,11 +166,55 @@ architecture rtl of vision_core_top is
     signal av_write_n      : std_logic;
     signal av_chipselect   : std_logic;
 
+    signal man_av_address       : std_logic_vector(24 downto 0);
+    signal man_av_writedata     : std_logic_vector(15 downto 0);
+    signal man_av_byteenable_n  : std_logic_vector(1 downto 0);
+    signal man_av_read_n        : std_logic;
+    signal man_av_write_n       : std_logic;
+    signal man_av_chipselect    : std_logic;
+    signal man_hex0             : std_logic_vector(6 downto 0);
+    signal man_hex1             : std_logic_vector(6 downto 0);
+    signal man_hex2             : std_logic_vector(6 downto 0);
+    signal man_hex3             : std_logic_vector(6 downto 0);
+    signal man_hex4             : std_logic_vector(6 downto 0);
+    signal man_hex5             : std_logic_vector(6 downto 0);
+
+    signal auto_av_address       : std_logic_vector(24 downto 0);
+    signal auto_av_writedata     : std_logic_vector(15 downto 0);
+    signal auto_av_byteenable_n  : std_logic_vector(1 downto 0);
+    signal auto_av_read_n        : std_logic;
+    signal auto_av_write_n       : std_logic;
+    signal auto_av_chipselect    : std_logic;
+    signal auto_hex0             : std_logic_vector(6 downto 0);
+    signal auto_hex1             : std_logic_vector(6 downto 0);
+    signal auto_hex2             : std_logic_vector(6 downto 0);
+    signal auto_hex3             : std_logic_vector(6 downto 0);
+    signal auto_hex4             : std_logic_vector(6 downto 0);
+    signal auto_hex5             : std_logic_vector(6 downto 0);
+
+    signal auto_busy    : std_logic;
+    signal auto_active  : std_logic;
+    signal btn_test_stb : std_logic;
+
 begin
 
     -- Assert the controller reset while the PLL is not locked.
     -- Reset release is synchronized inside memory_subsystem.
     pll_not_locked <= not pll_locked;
+
+    av_address       <= auto_av_address       when auto_busy = '1' else man_av_address;
+    av_writedata     <= auto_av_writedata     when auto_busy = '1' else man_av_writedata;
+    av_byteenable_n  <= auto_av_byteenable_n  when auto_busy = '1' else man_av_byteenable_n;
+    av_read_n        <= auto_av_read_n        when auto_busy = '1' else man_av_read_n;
+    av_write_n       <= auto_av_write_n       when auto_busy = '1' else man_av_write_n;
+    av_chipselect    <= auto_av_chipselect    when auto_busy = '1' else man_av_chipselect;
+
+    HEX0 <= auto_hex0 when auto_active = '1' else man_hex0;
+    HEX1 <= auto_hex1 when auto_active = '1' else man_hex1;
+    HEX2 <= auto_hex2 when auto_active = '1' else man_hex2;
+    HEX3 <= auto_hex3 when auto_active = '1' else man_hex3;
+    HEX4 <= auto_hex4 when auto_active = '1' else man_hex4;
+    HEX5 <= auto_hex5 when auto_active = '1' else man_hex5;
 
     u_memory_subsystem : memory_subsystem
         port map (
@@ -185,31 +255,67 @@ begin
             reset_n_out   => reset_n_sys,
             reset_req_out => reset_req_sys
         );
-        
-        
-        u_memory_test_master : memory_test_master
+
+
+    u_memory_test_master : memory_test_master
         port map (
             clk              => memory_clk,
             reset_req        => reset_req_sys,
             sw               => SW,
-            wr_stb           => btn_w_stb,
-            rd_stb           => btn_r_stb,
-            hex0             => HEX0,
-            hex1             => HEX1,
-            hex2             => HEX2,
-            hex3             => HEX3,
-            hex4             => HEX4,
-            hex5             => HEX5,
-            av_address       => av_address,
-            av_writedata     => av_writedata,
-            av_byteenable_n  => av_byteenable_n,
-            av_read_n        => av_read_n,
-            av_write_n       => av_write_n,
-            av_chipselect    => av_chipselect,
+            wr_stb           => btn_w_stb and not auto_busy,
+            rd_stb           => btn_r_stb and not auto_busy,
+            hex0             => man_hex0,
+            hex1             => man_hex1,
+            hex2             => man_hex2,
+            hex3             => man_hex3,
+            hex4             => man_hex4,
+            hex5             => man_hex5,
+            av_address       => man_av_address,
+            av_writedata     => man_av_writedata,
+            av_byteenable_n  => man_av_byteenable_n,
+            av_read_n        => man_av_read_n,
+            av_write_n       => man_av_write_n,
+            av_chipselect    => man_av_chipselect,
             av_readdata      => memory_readdata,
             av_readdatavalid => memory_readdatavalid,
             av_waitrequest   => memory_waitrequest
-        );     
+        );
+
+
+    u_memory_autotest : memory_autotest
+        port map (
+            clk              => memory_clk,
+            reset_req        => reset_req_sys,
+            start            => btn_test_stb and not auto_busy,
+            test_sel         => SW(2 downto 0),
+            av_address       => auto_av_address,
+            av_writedata     => auto_av_writedata,
+            av_byteenable_n  => auto_av_byteenable_n,
+            av_read_n        => auto_av_read_n,
+            av_write_n       => auto_av_write_n,
+            av_chipselect    => auto_av_chipselect,
+            av_readdata      => memory_readdata,
+            av_readdatavalid => memory_readdatavalid,
+            av_waitrequest   => memory_waitrequest,
+            busy             => auto_busy,
+            active           => auto_active,
+            hex0             => auto_hex0,
+            hex1             => auto_hex1,
+            hex2             => auto_hex2,
+            hex3             => auto_hex3,
+            hex4             => auto_hex4,
+            hex5             => auto_hex5
+        );
+
+
+    u_btn_test : button_conditioner
+        port map (
+            clk              => memory_clk,
+            rst              => rst_mem,
+            btn_n            => KEY(3),
+            level            => open,
+            stb              => btn_test_stb
+        );
 
     --------------------------------------------------------------------------
     -- Сброс фильтров кнопок: домен memory_clk
